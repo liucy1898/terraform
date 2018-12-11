@@ -420,7 +420,7 @@ func (p *blockBodyDiffPrinter) writeValue(val cty.Value, action plans.Action, in
 		return
 	}
 	if val.IsNull() {
-		p.buf.WriteString("null")
+		p.buf.WriteString(p.color.Color("[red]null[reset]"))
 		return
 	}
 
