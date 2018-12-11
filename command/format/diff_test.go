@@ -395,6 +395,30 @@ func TestResourceChange_JSON(t *testing.T) {
     }
 `,
 		},
+		"creation (empty)": {
+			Action: plans.Create,
+			Mode:   addrs.ManagedResourceMode,
+			Before: cty.NullVal(cty.EmptyObject),
+			After: cty.ObjectVal(map[string]cty.Value{
+				"id":         cty.UnknownVal(cty.String),
+				"json_field": cty.StringVal(`{}`),
+			}),
+			Schema: &configschema.Block{
+				Attributes: map[string]*configschema.Attribute{
+					"id":         {Type: cty.String, Optional: true, Computed: true},
+					"json_field": {Type: cty.String, Optional: true},
+				},
+			},
+			RequiredReplace: cty.NewPathSet(),
+			ExpectedOutput: `  # test_instance.example will be created
+  + resource "test_instance" "example" {
+      + id         = (known after apply)
+      + json_field = jsonencode(
+            { }
+        )
+    }
+`,
+		},
 	}
 	runTestCases(t, testCases)
 }
@@ -552,6 +576,31 @@ func TestResourceChange_primitiveList(t *testing.T) {
             "bbbb",
           - "cccc",
         ]
+    }
+`,
+		},
+		"creation - empty list": {
+			Action: plans.Create,
+			Mode:   addrs.ManagedResourceMode,
+			Before: cty.NullVal(cty.EmptyObject),
+			After: cty.ObjectVal(map[string]cty.Value{
+				"id":         cty.UnknownVal(cty.String),
+				"ami":        cty.StringVal("ami-STATIC"),
+				"list_field": cty.ListValEmpty(cty.String),
+			}),
+			Schema: &configschema.Block{
+				Attributes: map[string]*configschema.Attribute{
+					"id":         {Type: cty.String, Optional: true, Computed: true},
+					"ami":        {Type: cty.String, Optional: true},
+					"list_field": {Type: cty.List(cty.String), Optional: true},
+				},
+			},
+			RequiredReplace: cty.NewPathSet(),
+			ExpectedOutput: `  # test_instance.example will be created
+  + resource "test_instance" "example" {
+      + ami        = "ami-STATIC"
+      + id         = (known after apply)
+      + list_field = []
     }
 `,
 		},
@@ -715,6 +764,31 @@ func TestResourceChange_primitiveSet(t *testing.T) {
     }
 `,
 		},
+		"creation - empty set": {
+			Action: plans.Create,
+			Mode:   addrs.ManagedResourceMode,
+			Before: cty.NullVal(cty.EmptyObject),
+			After: cty.ObjectVal(map[string]cty.Value{
+				"id":        cty.UnknownVal(cty.String),
+				"ami":       cty.StringVal("ami-STATIC"),
+				"set_field": cty.SetValEmpty(cty.String),
+			}),
+			Schema: &configschema.Block{
+				Attributes: map[string]*configschema.Attribute{
+					"id":        {Type: cty.String, Optional: true, Computed: true},
+					"ami":       {Type: cty.String, Optional: true},
+					"set_field": {Type: cty.Set(cty.String), Optional: true},
+				},
+			},
+			RequiredReplace: cty.NewPathSet(),
+			ExpectedOutput: `  # test_instance.example will be created
+  + resource "test_instance" "example" {
+      + ami       = "ami-STATIC"
+      + id        = (known after apply)
+      + set_field = []
+    }
+`,
+		},
 	}
 	runTestCases(t, testCases)
 }
@@ -872,6 +946,31 @@ func TestResourceChange_map(t *testing.T) {
             "b" = "bbbb"
           - "c" = "cccc" -> null
         }
+    }
+`,
+		},
+		"creation - empty": {
+			Action: plans.Create,
+			Mode:   addrs.ManagedResourceMode,
+			Before: cty.NullVal(cty.EmptyObject),
+			After: cty.ObjectVal(map[string]cty.Value{
+				"id":        cty.UnknownVal(cty.String),
+				"ami":       cty.StringVal("ami-STATIC"),
+				"map_field": cty.MapValEmpty(cty.String),
+			}),
+			Schema: &configschema.Block{
+				Attributes: map[string]*configschema.Attribute{
+					"id":        {Type: cty.String, Optional: true, Computed: true},
+					"ami":       {Type: cty.String, Optional: true},
+					"map_field": {Type: cty.Map(cty.String), Optional: true},
+				},
+			},
+			RequiredReplace: cty.NewPathSet(),
+			ExpectedOutput: `  # test_instance.example will be created
+  + resource "test_instance" "example" {
+      + ami       = "ami-STATIC"
+      + id        = (known after apply)
+      + map_field = {}
     }
 `,
 		},

@@ -202,13 +202,18 @@ func (p *blockBodyDiffPrinter) writeBlockBodyDiff(schema *configschema.Block, ol
 
 func (p *blockBodyDiffPrinter) writeAttrDiff(name string, attrS *configschema.Attribute, old, new cty.Value, nameLen, indent int, path cty.Path) {
 	path = append(path, cty.GetAttrStep{Name: name})
-	p.buf.WriteString(strings.Repeat(" ", indent))
+
 	showJustNew := false
 	var action plans.Action
 	switch {
 	case old.IsNull():
 		action = plans.Create
 		showJustNew = true
+	case ctyEmptyStringToNull(old, new) || ctyEmptyIterableToNull(old, new):
+		// Avoid rendering "" -> null, [] -> null, or {} -> null
+		// as that's just technical debt from 0.11
+		// which doesn't know the difference between the two
+		return
 	case new.IsNull():
 		action = plans.Delete
 	case ctyEqualWithUnknown(old, new):
@@ -218,6 +223,7 @@ func (p *blockBodyDiffPrinter) writeAttrDiff(name string, attrS *configschema.At
 		action = plans.Update
 	}
 
+	p.buf.WriteString(strings.Repeat(" ", indent))
 	p.writeActionSymbol(action)
 
 	p.buf.WriteString(p.color.Color("[bold]"))
@@ -463,6 +469,11 @@ func (p *blockBodyDiffPrinter) writeValue(val cty.Value, action plans.Action, in
 			fmt.Fprintf(p.buf, "%#v", val)
 		}
 	case ty.IsListType() || ty.IsSetType() || ty.IsTupleType():
+		if val.LengthInt() == 0 {
+			p.buf.WriteString("[ ]")
+			return
+		}
+
 		p.buf.WriteString("[\n")
 
 		it := val.ElementIterator()
@@ -477,6 +488,10 @@ func (p *blockBodyDiffPrinter) writeValue(val cty.Value, action plans.Action, in
 		p.buf.WriteString(strings.Repeat(" ", indent))
 		p.buf.WriteString("]")
 	case ty.IsMapType():
+		if val.LengthInt() == 0 {
+			p.buf.WriteString("{ }")
+			return
+		}
 		p.buf.WriteString("{\n")
 
 		keyLen := 0
@@ -501,6 +516,11 @@ func (p *blockBodyDiffPrinter) writeValue(val cty.Value, action plans.Action, in
 		p.buf.WriteString(strings.Repeat(" ", indent))
 		p.buf.WriteString("}")
 	case ty.IsObjectType():
+		if val.LengthInt() == 0 {
+			// TODO: TEST
+			p.buf.WriteString("{ }")
+			return
+		}
 		p.buf.WriteString("{\n")
 
 		atys := ty.AttributeTypes()
@@ -849,6 +869,28 @@ func (p *blockBodyDiffPrinter) pathForcesNewResource(path cty.Path) bool {
 		return false
 	}
 	return p.requiredReplace.Has(path)
+}
+
+func ctyEmptyStringToNull(old, new cty.Value) bool {
+	if old.IsKnown() && new.IsKnown() && !old.IsNull() && new.IsNull() {
+		oldType := old.Type()
+		if oldType == cty.String && old.AsString() == "" {
+			return true
+		}
+	}
+	return false
+}
+
+func ctyEmptyIterableToNull(old, new cty.Value) bool {
+	if old.IsKnown() && new.IsKnown() && !old.IsNull() && new.IsNull() {
+		ty := old.Type()
+		if ty.IsListType() || ty.IsSetType() || ty.IsTupleType() || ty.IsMapType() || ty.IsObjectType() {
+			if old.LengthInt() == 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func ctyGetAttrMaybeNull(val cty.Value, name string) cty.Value {
